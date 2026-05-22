@@ -85,6 +85,9 @@ function App() {
     }
   };
 
+  const cellWidth = Math.round((210 - 20) / (config.columns || 1));
+  const cellHeight = Math.round((297 - 30) / (config.rows || 1));
+
   return (
     <div className="container">
       <header className="header">
@@ -249,7 +252,7 @@ function App() {
         <div className="glass-panel preview-box">
           <h2>Podgląd naklejki</h2>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem', fontSize: '0.9rem' }}>
-            Wymiary rzeczywiste: ~63x66 mm na formacie A4
+            Wymiary rzeczywiste: ~{cellWidth}x{cellHeight} mm na formacie A4
           </p>
           
           <div className="sticker-preview">
@@ -278,7 +281,7 @@ function App() {
 
       <footer className="footer">
         Aplikacja generuje gotowy do druku plik PDF (format A4) z naklejkami. 
-        Każda strona pomieści 12 naklejek.
+        Każda strona pomieści {(config.columns || 1) * (config.rows || 1)} naklejek.
       </footer>
     </div>
   );
