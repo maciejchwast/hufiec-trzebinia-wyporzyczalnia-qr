@@ -7,20 +7,40 @@ export interface StickerConfig {
   totalStickers: number;
   startId: number;
   baseUrl: string;
+  columns: number;
+  rows: number;
 }
 
-export async function generateStickersPDF(config: StickerConfig): Promise<void> {
+// Fetch font and convert to base64
+const fetchFontAsBase64 = async (url: string): Promise<string> => {
+  const response = await fetch(url);
+  const buffer = await response.arrayBuffer();
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunk = 8192; // Process in chunks to avoid stack overflow
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.slice(i, i + chunk)));
+  }
+  return btoa(binary);
+};
+
+export async function generateStickersPDF(
+  config: StickerConfig, 
+  onProgress?: (progress: number, statusText: string) => void
+): Promise<void> {
   // A4 dimensions in mm
   const PAGE_WIDTH = 210;
   const PAGE_HEIGHT = 297;
   
-  const COLS = 3;
-  const ROWS = 4;
+  const COLS = config.columns || 3;
+  const ROWS = config.rows || 4;
   const MARGIN_X = 10;
   const MARGIN_Y = 15;
   
   const CELL_WIDTH = (PAGE_WIDTH - (2 * MARGIN_X)) / COLS;
   const CELL_HEIGHT = (PAGE_HEIGHT - (2 * MARGIN_Y)) / ROWS;
+  
+  if (onProgress) onProgress(0, 'Inicjalizacja generatora PDF...');
   
   const pdf = new jsPDF({
     orientation: 'portrait',
@@ -28,8 +48,18 @@ export async function generateStickersPDF(config: StickerConfig): Promise<void> 
     format: 'a4'
   });
   
-  // Set default font
-  pdf.setFont('helvetica');
+  if (onProgress) onProgress(5, 'Pobieranie czcionki z polskimi znakami...');
+  
+  try {
+    // Load a font that supports Polish characters
+    const fontBase64 = await fetchFontAsBase64('https://cdn.jsdelivr.net/gh/googlefonts/roboto@main/src/hinted/Roboto-Regular.ttf');
+    pdf.addFileToVFS('Roboto-Regular.ttf', fontBase64);
+    pdf.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
+    pdf.setFont('Roboto');
+  } catch (e) {
+    console.error("Failed to load custom font, falling back to helvetica", e);
+    pdf.setFont('helvetica');
+  }
 
   const hexToRgb = (hex: string): [number, number, number] => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -63,11 +93,19 @@ export async function generateStickersPDF(config: StickerConfig): Promise<void> 
         
         currentId++;
         stickersProcessed++;
+        
+        if (onProgress && stickersProcessed % Math.max(1, Math.floor(config.totalStickers / 100)) === 0) {
+          const progressPercent = Math.min(100, Math.floor(10 + (stickersProcessed / config.totalStickers) * 90));
+          onProgress(progressPercent, `Generowanie: ${stickersProcessed} / ${config.totalStickers}`);
+          await new Promise(r => setTimeout(r, 0)); // Yield to main thread to update UI
+        }
       }
     }
   }
   
-  pdf.save('Naklejki_Hufiec_Trzebinia.pdf');
+  if (onProgress) onProgress(100, 'Zapisywanie pliku...');
+  const lastId = config.startId + config.totalStickers - 1;
+  pdf.save(`Naklejki_Hufiec_Trzebinia_${config.startId}_do_${lastId}.pdf`);
 }
 
 async function drawSticker(

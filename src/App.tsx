@@ -9,13 +9,17 @@ function App() {
     themeColor: '#006600', // ZHP_GREEN approximate
     totalStickers: 12,
     startId: 1,
-    baseUrl: 'https://forms.office.com/Pages/ResponsePage.aspx?id=Ho024XU55kyJPfw1H9RNzSxpBz6AyaJNo0NTIfN0GNBUNVgzOVBTVE1ZUFdDMlFHTjMxOEJJRFY2WS4u&r6e9f3bdf980d4a21b510d0a9e2af8516='
+    baseUrl: 'https://forms.office.com/Pages/ResponsePage.aspx?id=Ho024XU55kyJPfw1H9RNzSxpBz6AyaJNo0NTIfN0GNBUNVgzOVBTVE1ZUFdDMlFHTjMxOEJJRFY2WS4u&r6e9f3bdf980d4a21b510d0a9e2af8516=',
+    columns: 3,
+    rows: 4
   });
 
   const [baseUrlLocked, setBaseUrlLocked] = useState(true);
   const [showUnlockWarning, setShowUnlockWarning] = useState(false);
   const [previewQr, setPreviewQr] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [progressPercent, setProgressPercent] = useState(0);
+  const [progressText, setProgressText] = useState('');
 
   useEffect(() => {
     // Generate QR code for preview
@@ -64,13 +68,20 @@ function App() {
 
   const handleGenerate = async () => {
     setIsGenerating(true);
+    setProgressPercent(0);
+    setProgressText('Przygotowywanie...');
     try {
-      await generateStickersPDF(config);
+      await generateStickersPDF(config, (progress, statusText) => {
+        setProgressPercent(progress);
+        setProgressText(statusText);
+      });
     } catch (err) {
       console.error(err);
       alert('Wystąpił błąd podczas generowania pliku PDF.');
     } finally {
       setIsGenerating(false);
+      setProgressPercent(0);
+      setProgressText('');
     }
   };
 
@@ -111,6 +122,36 @@ function App() {
                   onChange={handleInputChange}
                 />
                 <span>{config.themeColor.toUpperCase()}</span>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="form-group">
+                <label htmlFor="columns">Kolumny na stronę</label>
+                <input
+                  type="number"
+                  id="columns"
+                  name="columns"
+                  className="form-control"
+                  value={config.columns}
+                  onChange={handleInputChange}
+                  min="1"
+                  max="10"
+                />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="rows">Rzędy na stronę</label>
+                <input
+                  type="number"
+                  id="rows"
+                  name="rows"
+                  className="form-control"
+                  value={config.rows}
+                  onChange={handleInputChange}
+                  min="1"
+                  max="20"
+                />
               </div>
             </div>
 
@@ -183,9 +224,23 @@ function App() {
               className="primary-btn" 
               onClick={handleGenerate}
               disabled={isGenerating}
+              style={{ position: 'relative', overflow: 'hidden' }}
             >
-              <Download size={20} />
-              {isGenerating ? 'Generowanie...' : 'Pobierz Plik PDF (A4)'}
+              {isGenerating && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  height: '100%',
+                  width: `${progressPercent}%`,
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  transition: 'width 0.1s linear'
+                }} />
+              )}
+              <Download size={20} style={{ position: 'relative', zIndex: 1 }} />
+              <span style={{ position: 'relative', zIndex: 1 }}>
+                {isGenerating ? progressText : 'Pobierz Plik PDF (A4)'}
+              </span>
             </button>
           </div>
         </div>
